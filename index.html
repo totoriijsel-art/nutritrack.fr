@@ -73,6 +73,12 @@ input, select {width:100%;padding:10px;margin:5px 0 15px 0;background-color:var(
 </div>
 </div>
 <script>
+// Nettoyage forcé du vieux cache corrompu au premier chargement
+if (!localStorage.getItem('nutritrack_cache_v2')) {
+    localStorage.removeItem('searchCache');
+    localStorage.setItem('nutritrack_cache_v2', 'true');
+}
+
 let searchCache = JSON.parse(localStorage.getItem('searchCache')) || {}, debounceTimer;
 document.getElementById('current-date').valueAsDate = new Date();
 
