@@ -53,7 +53,7 @@ input, select {width:100%;padding:10px;margin:5px 0 15px 0;background-color:var(
 <div class="card">
 <h3>Ajouter un aliment</h3>
 <label>Recherche (Open Food Facts)</label>
-<input type="text" id="search-input" placeholder="Ex: Pomme, Banane, Yaourt..." oninput="debounceSearch()">
+<input type="text" id="search-input" placeholder="Ex: Fraise, Banane, Yaourt..." oninput="debounceSearch()">
 <div id="search-results" class="search-results"></div>
 <label>Nom de l'aliment</label>
 <input type="text" id="food-name">
@@ -108,7 +108,7 @@ function debounceSearch() {
 async function searchFood(q) {
     if (searchCache[q]) { displayResults(searchCache[q]); return; }
     try {
-        const url = `https://fr.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1&page_size=15`;
+        const url = `https://fr.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1&page_size=20`;
         const res = await fetch(url);
         const data = await res.json();
         
@@ -120,8 +120,22 @@ async function searchFood(q) {
             fat: p.nutriments?.['fat_100g'] || 0
         })).filter(p => p.name && p.name !== 'Inconnu');
 
-        // Tri intelligent : met en priorité les produits dont le nom est le plus court (ex: "Banane" avant "Yaourt aromatisé à la banane")
-        products.sort((a, b) => a.name.length - b.name.length);
+        // Filtrage intelligent : donne la priorité absolue aux produits dont le nom correspond exactement ou commence par le mot cherché (ex: "Fraise", "Fraises" avant "Confiture de fraise")
+        products.sort((a, b) => {
+            let queryLower = q.toLowerCase();
+            let aName = a.name.toLowerCase();
+            let bName = b.name.toLowerCase();
+            
+            let aExact = aName === queryLower ? 0 : 1;
+            let bExact = bName === queryLower ? 0 : 1;
+            if (aExact !== bExact) return aExact - bExact;
+
+            let aStarts = aName.startsWith(queryLower) ? 0 : 1;
+            let bStarts = bName.startsWith(queryLower) ? 0 : 1;
+            if (aStarts !== bStarts) return aStarts - bStarts;
+
+            return aName.length - bName.length;
+        });
 
         searchCache[q] = products;
         localStorage.setItem('searchCache', JSON.stringify(searchCache));
