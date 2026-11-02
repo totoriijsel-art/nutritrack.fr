@@ -1,3 +1,109 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NutriTrack</title>
+<link rel="apple-touch-icon" href="icon.png">
+<style>
+:root {--bg-color:#f4f7f6;--card-bg:#fff;--text-color:#333;--primary-color:#2ecc71;--primary-hover:#27ae60;--border-color:#ddd;--input-bg:#fff}
+[data-theme="dark"] {--bg-color:#121212;--card-bg:#1e1e1e;--text-color:#e0e0e0;--primary-color:#27ae60;--primary-hover:#27ae60;--border-color:#333;--input-bg:#2a2a2a}
+body {font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background-color:var(--bg-color);color:var(--text-color);margin:0;padding:15px;display:flex;flex-direction:column;align-items:center;transition:background .3s,color .3s}
+.container {width:100%;max-width:500px}
+header {display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
+.brand {display:flex;align-items:center;gap:12px}
+.brand img {width:75px;height:75px;object-fit:contain;border-radius:12px}
+h1 {font-size:1.5rem;margin:0}
+button {background-color:var(--primary-color);color:#fff;border:none;padding:10px 15px;border-radius:8px;cursor:pointer;font-weight:bold;transition:background .2s}
+button:hover {background-color:var(--primary-hover)}
+.card {background-color:var(--card-bg);border:1px solid var(--border-color);padding:15px;border-radius:12px;margin-bottom:15px;box-shadow:0 2px 5px rgba(0,0,0,.05)}
+input, select {width:100%;padding:10px;margin:5px 0 15px 0;background-color:var(--input-bg);color:var(--text-color);border:1px solid var(--border-color);border-radius:6px;box-sizing:border-box}
+.macro-grid {display:grid;grid-template-columns:repeat(4,1fr);gap:8px;text-align:center;margin-top:10px}
+.macro-box {background:var(--bg-color);padding:8px;border-radius:6px;font-size:.85rem}
+.search-results {max-height:150px;overflow-y:auto;border:1px solid var(--border-color);background:var(--card-bg);display:none;position:absolute;width:calc(100% - 30px);max-width:470px;z-index:10;border-radius:6px}
+.search-item {padding:8px;cursor:pointer;border-bottom:1px solid var(--border-color)}
+.search-item:hover {background-color:var(--bg-color)}
+</style>
+</head>
+<body data-theme="light">
+<div class="container">
+<header>
+<div class="brand">
+<img src="logo.png" alt="Logo" onerror="this.style.display='none'">
+<h1>NutriTrack</h1>
+</div>
+<button onclick="toggleTheme()">🌓 Thème</button>
+</header>
+<div class="card">
+<h3>Objectifs du jour</h3>
+<label>Date : <input type="date" id="current-date" onchange="loadDayData()"></label>
+<div style="margin-bottom:10px;display:flex;align-items:center;gap:10px;">
+    <span>Calories cibles :</span> 
+    <input type="number" id="target-cal-input" value="2000" oninput="updateTargetCal()" style="width:100px;margin:0;padding:6px;"> 
+    <span>kcal</span>
+</div>
+<div class="macro-grid">
+<div class="macro-box">Cals<br><strong id="sum-cal">0</strong> / <span id="display-target">2000</span></div>
+<div class="macro-box">Pro<br><strong id="sum-pro">0g</strong></div>
+<div class="macro-box">Gluc<br><strong id="sum-carb">0g</strong></div>
+<div class="macro-box">Lip<br><strong id="sum-fat">0g</strong></div>
+</div>
+</div>
+<div class="card">
+<h3>Ajouter un aliment</h3>
+<label>Recherche (Open Food Facts)</label>
+<input type="text" id="search-input" placeholder="Ex: Fraise, Banane, Yaourt..." oninput="debounceSearch()">
+<div id="search-results" class="search-results"></div>
+<label>Nom de l'aliment</label>
+<input type="text" id="food-name">
+<div style="display:flex;gap:10px">
+<div style="flex:1"><label>Quantité (g)</label><input type="number" id="food-qty" value="100"></div>
+<div style="flex:1"><label>Calories (100g)</label><input type="number" id="food-cal-100"></div>
+</div>
+<div class="macro-grid">
+<div><label>Pro</label><input type="number" id="food-pro-100"></div>
+<div><label>Gluc</label><input type="number" id="food-carb-100"></div>
+<div><label>Lip</label><input type="number" id="food-fat-100"></div>
+</div>
+<button onclick="addFoodEntry()" style="width:100%;margin-top:10px">Ajouter au journal</button>
+</div>
+<div class="card">
+<h3>Journal</h3>
+<div id="food-list">Aucun aliment enregistré.</div>
+</div>
+</div>
+<script>
+let searchCache = JSON.parse(localStorage.getItem('searchCache')) || {}, debounceTimer;
+document.getElementById('current-date').valueAsDate = new Date();
+
+let savedTarget = localStorage.getItem('nutritrack_target') || 2000;
+document.getElementById('target-cal-input').value = savedTarget;
+document.getElementById('display-target').innerText = savedTarget;
+
+function updateTargetCal() {
+    let val = parseInt(document.getElementById('target-cal-input').value) || 2000;
+    localStorage.setItem('nutritrack_target', val);
+    document.getElementById('display-target').innerText = val;
+}
+
+loadDayData();
+
+function toggleTheme() {
+    const b = document.body;
+    b.dataset.theme = b.dataset.theme === 'light' ? 'dark' : 'light';
+    localStorage.setItem('theme', b.dataset.theme);
+}
+if(localStorage.getItem('theme')) document.body.dataset.theme = localStorage.getItem('theme');
+
+function cleanFoodName(n) { return n ? n.replace(/\s*\(.*?\)\s*/g, ' ').trim() : ''; }
+
+function debounceSearch() {
+    clearTimeout(debounceTimer);
+    const q = document.getElementById('search-input').value.trim();
+    if (q.length < 2) { document.getElementById('search-results').style.display = 'none'; return; }
+    debounceTimer = setTimeout(() => searchFood(q), 150);
+}
+
 async function searchFood(q) {
     if (searchCache[q]) { displayResults(searchCache[q]); return; }
     try {
@@ -16,7 +122,7 @@ async function searchFood(q) {
             if (!p.name || p.name === 'Inconnu') return false;
             let nameLower = p.name.toLowerCase();
             
-            // Si on recherche un fruit brut, on écarte les produits transformés évidents
+            // Filtre strict pour les recherches courtes (fruits bruts)
             if (qLower.length <= 6) {
                 const bannedWords = ['confiture', 'danino', 'yaourt', 'sirop', 'biscuits', 'gâteau', 'glace', 'tarte', 'boisson', 'nectar', 'jus', 'arôme', 'préparation', 'carré frais', 'jben'];
                 for (let word of bannedWords) {
@@ -26,7 +132,7 @@ async function searchFood(q) {
             return true;
         });
 
-        // Tri strict : met les correspondances exactes ou les noms les plus courts (fruits bruts) en premier
+        // Tri intelligent pour mettre les fruits bruts et correspondances exactes en premier
         products.sort((a, b) => {
             let aName = a.name.toLowerCase();
             let bName = b.name.toLowerCase();
@@ -43,3 +149,92 @@ async function searchFood(q) {
         console.error('Erreur API Open Food Facts:', e); 
     }
 }
+
+function displayResults(products) {
+    const container = document.getElementById('search-results');
+    container.innerHTML = '';
+    if (!products || products.length === 0) { container.style.display = 'none'; return; }
+    products.slice(0, 5).forEach(p => {
+        const div = document.createElement('div');
+        div.className = 'search-item';
+        div.innerText = `${p.name} (${p.calories} kcal/100g)`;
+        div.onclick = () => selectProduct(p);
+        container.appendChild(div);
+    });
+    container.style.display = 'block';
+}
+
+function selectProduct(p) {
+    document.getElementById('food-name').value = p.name;
+    document.getElementById('food-cal-100').value = p.calories;
+    document.getElementById('food-pro-100').value = p.proteins;
+    document.getElementById('food-carb-100').value = p.carbohydrates;
+    document.getElementById('food-fat-100').value = p.fat;
+    document.getElementById('search-results').style.display = 'none';
+    document.getElementById('search-input').value = '';
+}
+
+function addFoodEntry() {
+    const date = document.getElementById('current-date').value;
+    const name = document.getElementById('food-name').value;
+    const qty = parseFloat(document.getElementById('food-qty').value) || 0;
+    const cal100 = parseFloat(document.getElementById('food-cal-100').value) || 0;
+    const pro100 = parseFloat(document.getElementById('food-pro-100').value) || 0;
+    const carb100 = parseFloat(document.getElementById('food-carb-100').value) || 0;
+    const fat100 = parseFloat(document.getElementById('food-fat-100').value) || 0;
+    if (!name || qty <= 0) return alert("Remplissez le nom et la quantité.");
+    const entry = {
+        name, qty,
+        cal: Math.round((cal100 * qty) / 100),
+        pro: parseFloat(((pro100 * qty) / 100).toFixed(1)),
+        carb: parseFloat(((carb100 * qty) / 100).toFixed(1)),
+        fat: parseFloat(((fat100 * qty) / 100).toFixed(1))
+    };
+    let db = JSON.parse(localStorage.getItem('nutritrack_db')) || {};
+    if (!db[date]) db[date] = [];
+    db[date].push(entry);
+    localStorage.setItem('nutritrack_db', JSON.stringify(db));
+    document.getElementById('food-name').value = '';
+    document.getElementById('food-qty').value = '100';
+    document.getElementById('food-cal-100').value = '';
+    document.getElementById('food-pro-100').value = '';
+    document.getElementById('food-carb-100').value = '';
+    document.getElementById('food-fat-100').value = '';
+    loadDayData();
+}
+
+function loadDayData() {
+    const date = document.getElementById('current-date').value;
+    const entries = JSON.parse(localStorage.getItem('nutritrack_db'))?.[date] || [];
+    const listContainer = document.getElementById('food-list');
+    listContainer.innerHTML = '';
+    let totalCal = 0, totalPro = 0, totalCarb = 0, totalFat = 0;
+    if (entries.length === 0) {
+        listContainer.innerHTML = '<p style="color:#888;font-size:0.9rem;">Aucun aliment enregistré.</p>';
+    } else {
+        entries.forEach((e, index) => {
+            totalCal += e.cal; totalPro += e.pro; totalCarb += e.carb; totalFat += e.fat;
+            const item = document.createElement('div');
+            item.style.cssText = "display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border-color);padding:8px 0;";
+            item.innerHTML = `<div><strong>${e.name}</strong> (${e.qty}g)<br><small>${e.cal} kcal | P:${e.pro}g | G:${e.carb}g | L:${e.fat}g</small></div><button onclick="deleteEntry('${date}', ${index})" style="background:#e74c3c;padding:5px 10px;font-size:0.8rem;">X</button>`;
+            listContainer.appendChild(item);
+        });
+    }
+    document.getElementById('sum-cal').innerText = totalCal;
+    document.getElementById('sum-pro').innerText = totalPro.toFixed(1) + 'g';
+    document.getElementById('sum-carb').innerText = totalCarb.toFixed(1) + 'g';
+    document.getElementById('sum-fat').innerText = totalFat.toFixed(1) + 'g';
+}
+
+function deleteEntry(date, index) {
+    let db = JSON.parse(localStorage.getItem('nutritrack_db')) || {};
+    if (db[date]) {
+        db[date].splice(index, 1);
+        if (db[date].length === 0) delete db[date];
+        localStorage.setItem('nutritrack_db', JSON.stringify(db));
+        loadDayData();
+    }
+}
+</script>
+</body>
+</html>
