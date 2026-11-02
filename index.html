@@ -40,15 +40,15 @@ input, select {width:100%;padding:10px;margin:5px 0 15px 0;background-color:var(
 <label>Date : <input type="date" id="current-date" onchange="loadDayData()"></label>
 <div>Calories cibles : <span id="target-cal">2000</span> kcal</div>
 <div class="macro-grid">
-<div class="macro-box">Calories<br><strong id="sum-cal">0</strong></div>
-<div class="macro-box">Protèine<br><strong id="sum-pro">0g</strong></div>
-<div class="macro-box">Glucide<br><strong id="sum-carb">0g</strong></div>
-<div class="macro-box">Lipide<br><strong id="sum-fat">0g</strong></div>
+<div class="macro-box">Cals<br><strong id="sum-cal">0</strong></div>
+<div class="macro-box">Pro<br><strong id="sum-pro">0g</strong></div>
+<div class="macro-box">Gluc<br><strong id="sum-carb">0g</strong></div>
+<div class="macro-box">Lip<br><strong id="sum-fat">0g</strong></div>
 </div>
 </div>
 <div class="card">
 <h3>Ajouter un aliment</h3>
-<label>Recherche</label>
+<label>Recherche (Open Food Facts)</label>
 <input type="text" id="search-input" placeholder="Ex: Yaourt, Banane..." oninput="debounceSearch()">
 <div id="search-results" class="search-results"></div>
 <label>Nom de l'aliment</label>
@@ -89,24 +89,42 @@ function debounceSearch() {
 async function searchFood(q) {
     if (searchCache[q]) { displayResults(searchCache[q]); return; }
     try {
-        const res = await fetch(`https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1`);
+        const url = `https://world.openfoodfacts.org/api/v2/search?categories_tags_en=${encodeURIComponent(q)}&fields=product_name,product_name_fr,nutriments&page_size=5`;
+        const res = await fetch(url);
         const data = await res.json();
-        const products = data.products.map(p => ({
+        
+        let products = (data.products || []).map(p => ({
             name: cleanFoodName(p.product_name_fr || p.product_name || 'Inconnu'),
-            calories: p.nutriments['energy-kcal_100g'] || p.nutriments['energy-kcal'] || 0,
-            proteins: p.nutriments['proteins_100g'] || 0,
-            carbohydrates: p.nutriments['carbohydrates_100g'] || 0,
-            fat: p.nutriments['fat_100g'] || 0
-        })).filter(p => p.name);
+            calories: p.nutriments?.['energy-kcal_100g'] || p.nutriments?.['energy-kcal'] || 0,
+            proteins: p.nutriments?.['proteins_100g'] || 0,
+            carbohydrates: p.nutriments?.['carbohydrates_100g'] || 0,
+            fat: p.nutriments?.['fat_100g'] || 0
+        })).filter(p => p.name && p.name !== 'Inconnu');
+
+        // Secours sur la recherche globale si la catégorie ne donne rien
+        if (products.length === 0) {
+            const fallbackRes = await fetch(`https://fr.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1`);
+            const fallbackData = await fallbackRes.json();
+            products = (fallbackData.products || []).map(p => ({
+                name: cleanFoodName(p.product_name_fr || p.product_name || 'Inconnu'),
+                calories: p.nutriments?.['energy-kcal_100g'] || p.nutriments?.['energy-kcal'] || 0,
+                proteins: p.nutriments?.['proteins_100g'] || 0,
+                carbohydrates: p.nutriments?.['carbohydrates_100g'] || 0,
+                fat: p.nutriments?.['fat_100g'] || 0
+            })).filter(p => p.name && p.name !== 'Inconnu');
+        }
+
         searchCache[q] = products;
         localStorage.setItem('searchCache', JSON.stringify(searchCache));
         displayResults(products);
-    } catch (e) { console.error(e); }
+    } catch (e) { 
+        console.error('Erreur API Open Food Facts:', e); 
+    }
 }
 function displayResults(products) {
     const container = document.getElementById('search-results');
     container.innerHTML = '';
-    if (products.length === 0) { container.style.display = 'none'; return; }
+    if (!products || products.length === 0) { container.style.display = 'none'; return; }
     products.slice(0, 5).forEach(p => {
         const div = document.createElement('div');
         div.className = 'search-item';
