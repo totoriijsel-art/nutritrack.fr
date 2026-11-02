@@ -108,8 +108,8 @@ function debounceSearch() {
 async function searchFood(q) {
     if (searchCache[q]) { displayResults(searchCache[q]); return; }
     try {
-        // Recherche prioritaire via l'API V2 orientée produits bruts / catégories
-        const url = `https://world.openfoodfacts.org/api/v2/search?states_tags=en:complete&countries_tags=en:france&search_terms=${encodeURIComponent(q)}&fields=product_name,product_name_fr,nutriments,categories_tags&page_size=20`;
+        // Utilisation d'une URL HTTPS stricte et compatible web public
+        const url = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1&page_size=20`;
         const res = await fetch(url);
         const data = await res.json();
         
@@ -119,28 +119,22 @@ async function searchFood(q) {
             calories: p.nutriments?.['energy-kcal_100g'] || p.nutriments?.['energy-kcal'] || 0,
             proteins: p.nutriments?.['proteins_100g'] || 0,
             carbohydrates: p.nutriments?.['carbohydrates_100g'] || 0,
-            fat: p.nutriments?.['fat_100g'] || 0,
-            categories: p.categories_tags || []
+            fat: p.nutriments?.['fat_100g'] || 0
         })).filter(p => {
             if (!p.name || p.name === 'Inconnu') return false;
             let nameLower = p.name.toLowerCase();
-            
-            // Exclure les produits transformés / laitiers indésirables si on cherche un fruit
-            if (qLower === 'fraise' && (nameLower.includes('confiture') || nameLower.includes('danino')  || nameLower.includes('carré frais') || nameLower.includes('jben') || nameLower.includes('yaourt') || nameLower.includes('sirop') || nameLower.includes('biscuits'))) {
+            if (qLower === 'fraise' && (nameLower.includes('confiture') || nameLower.includes('danino') || nameLower.includes('carré frais') || nameLower.includes('jben') || nameLower.includes('yaourt'))) {
                 return false;
             }
             return true;
         });
 
-        // Tri strict : place le produit dont le nom correspond le plus court/exact tout en haut
         products.sort((a, b) => {
             let aName = a.name.toLowerCase();
             let bName = b.name.toLowerCase();
-            
             let aExact = aName === qLower ? 0 : 1;
             let bExact = bName === qLower ? 0 : 1;
             if (aExact !== bExact) return aExact - bExact;
-
             return aName.length - bName.length;
         });
 
@@ -148,7 +142,7 @@ async function searchFood(q) {
         localStorage.setItem('searchCache', JSON.stringify(searchCache));
         displayResults(products);
     } catch (e) { 
-        console.error('Erreur API Open Food Facts:', e); 
+        console.error('Erreur réseau / API Open Food Facts:', e); 
     }
 }
 
