@@ -107,8 +107,7 @@ function debounceSearch() {
 async function searchFood(q) {
     if (searchCache[q]) { displayResults(searchCache[q]); return; }
     try {
-        // Utilisation de la recherche textuelle simple en français
-        const url = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1&page_size=20`;
+        const url = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1&page_size=30`;
         const res = await fetch(url);
         const data = await res.json();
         
@@ -122,14 +121,19 @@ async function searchFood(q) {
         })).filter(p => {
             if (!p.name || p.name === 'Inconnu') return false;
             let nameLower = p.name.toLowerCase();
-            // Élimine les produits dérivés indésirables lors de la recherche de fruits bruts
-            if (qLower === 'fraise' && (nameLower.includes('confiture') || nameLower.includes('danino') || nameLower.includes('carré frais') || nameLower.includes('jben') || nameLower.includes('sirop'))) {
-                return false;
+            
+            // FILTRE STRICT : Si on cherche un fruit court (comme "fraise"), 
+            // on exclut tout ce qui contient "confiture", "yaourt", "sirop", "biscuits", "arôme", etc.
+            if (qLower.length <= 6) {
+                const bannedWords = ['confiture', 'danino', 'yaourt', 'sirop', 'biscuits', 'gâteau', 'glace', 'tarte', 'boisson', 'nectar', 'jus', 'arôme', 'préparation', 'carré frais', 'jben'];
+                for (let word of bannedWords) {
+                    if (nameLower.includes(word)) return false;
+                }
             }
             return true;
         });
 
-        // Trie pour afficher le nom le plus court / exact en premier
+        // Tri intelligent : place les noms les plus courts et correspondants en premier
         products.sort((a, b) => {
             let aName = a.name.toLowerCase();
             let bName = b.name.toLowerCase();
