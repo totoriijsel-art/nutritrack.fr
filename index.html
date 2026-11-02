@@ -122,7 +122,6 @@ async function searchFood(q) {
             if (!p.name || p.name === 'Inconnu') return false;
             let nameLower = p.name.toLowerCase();
             
-            // Filtre strict pour les recherches courtes (fruits bruts)
             if (qLower.length <= 6) {
                 const bannedWords = ['confiture', 'danino', 'yaourt', 'sirop', 'biscuits', 'gâteau', 'glace', 'tarte', 'boisson', 'nectar', 'jus', 'arôme', 'préparation', 'carré frais', 'jben'];
                 for (let word of bannedWords) {
@@ -132,7 +131,6 @@ async function searchFood(q) {
             return true;
         });
 
-        // Tri intelligent pour mettre les fruits bruts et correspondances exactes en premier
         products.sort((a, b) => {
             let aName = a.name.toLowerCase();
             let bName = b.name.toLowerCase();
@@ -206,9 +204,9 @@ function addFoodEntry() {
 function loadDayData() {
     const date = document.getElementById('current-date').value;
     const entries = JSON.parse(localStorage.getItem('nutritrack_db'))?.[date] || [];
+    let totalCal = 0, totalPro = 0, totalCarb = 0, totalFat = 0;
     const listContainer = document.getElementById('food-list');
     listContainer.innerHTML = '';
-    let totalCal = 0, totalPro = 0, totalCarb = 0, totalFat = 0;
     if (entries.length === 0) {
         listContainer.innerHTML = '<p style="color:#888;font-size:0.9rem;">Aucun aliment enregistré.</p>';
     } else {
