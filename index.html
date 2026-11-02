@@ -38,9 +38,13 @@ input, select {width:100%;padding:10px;margin:5px 0 15px 0;background-color:var(
 <div class="card">
 <h3>Objectifs du jour</h3>
 <label>Date : <input type="date" id="current-date" onchange="loadDayData()"></label>
-<div style="margin-bottom:10px;">Calories cibles : <input type="number" id="target-cal-input" value="2000" onchange="updateTargetCal()" style="display:inline-block;width:110px;padding:5px;margin:0 5px;"> kcal</div>
+<div style="margin-bottom:10px;display:flex;align-items:center;gap:10px;">
+    <span>Calories cibles :</span> 
+    <input type="number" id="target-cal-input" value="2000" oninput="updateTargetCal()" style="width:100px;margin:0;padding:6px;"> 
+    <span>kcal</span>
+</div>
 <div class="macro-grid">
-<div class="macro-box">Cals<br><strong id="sum-cal">0</strong></div>
+<div class="macro-box">Cals<br><strong id="sum-cal">0</strong> / <span id="display-target">2000</span></div>
 <div class="macro-box">Pro<br><strong id="sum-pro">0g</strong></div>
 <div class="macro-box">Gluc<br><strong id="sum-carb">0g</strong></div>
 <div class="macro-box">Lip<br><strong id="sum-fat">0g</strong></div>
@@ -73,13 +77,14 @@ input, select {width:100%;padding:10px;margin:5px 0 15px 0;background-color:var(
 let searchCache = JSON.parse(localStorage.getItem('searchCache')) || {}, debounceTimer;
 document.getElementById('current-date').valueAsDate = new Date();
 
-// Charger l'objectif calorique sauvegardé
 let savedTarget = localStorage.getItem('nutritrack_target') || 2000;
 document.getElementById('target-cal-input').value = savedTarget;
+document.getElementById('display-target').innerText = savedTarget;
 
 function updateTargetCal() {
     let val = parseInt(document.getElementById('target-cal-input').value) || 2000;
     localStorage.setItem('nutritrack_target', val);
+    document.getElementById('display-target').innerText = val;
 }
 
 loadDayData();
