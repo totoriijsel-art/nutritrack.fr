@@ -52,7 +52,7 @@ input, select {width:100%;padding:10px;margin:5px 0 15px 0;background-color:var(
 <div class="card">
 <h3>Ajouter un aliment</h3>
 <label>Recherche (Open Food Facts)</label>
-<input type="text" id="search-input" placeholder="Ex: Pomme, Fraise, Banane..." oninput="debounceSearch()">
+<input type="text" id="search-input" placeholder="Ex: Fraise, Banane, Pomme..." oninput="debounceSearch()">
 <div id="search-results" class="search-results"></div>
 <label>Nom de l'aliment</label>
 <input type="text" id="food-name">
@@ -73,25 +73,38 @@ input, select {width:100%;padding:10px;margin:5px 0 15px 0;background-color:var(
 </div>
 </div>
 <script>
-// Base locale ultra-fournie pour garantir que les fruits bruts sortent toujours en premier
+// Base de données locale prioritaire pour les fruits et aliments bruts incontournables
 const localRawFoods = [
     { name: "Pomme", calories: 52, proteins: 0.3, carbohydrates: 13.8, fat: 0.2 },
     { name: "Pommes", calories: 52, proteins: 0.3, carbohydrates: 13.8, fat: 0.2 },
     { name: "Fraise", calories: 33, proteins: 0.7, carbohydrates: 7.7, fat: 0.3 },
     { name: "Fraises", calories: 33, proteins: 0.7, carbohydrates: 7.7, fat: 0.3 },
     { name: "Banane", calories: 89, proteins: 1.1, carbohydrates: 22.8, fat: 0.3 },
+    { name: "Bananes", calories: 89, proteins: 1.1, carbohydrates: 22.8, fat: 0.3 },
     { name: "Orange", calories: 47, proteins: 0.9, carbohydrates: 11.8, fat: 0.1 },
+    { name: "Oranges", calories: 47, proteins: 0.9, carbohydrates: 11.8, fat: 0.1 },
     { name: "Poire", calories: 57, proteins: 0.4, carbohydrates: 15.2, fat: 0.1 },
+    { name: "Poires", calories: 57, proteins: 0.4, carbohydrates: 15.2, fat: 0.1 },
+    { name: "Pastèque", calories: 30, proteins: 0.6, carbohydrates: 7.6, fat: 0.2 },
+    { name: "Pastèques", calories: 30, proteins: 0.6, carbohydrates: 7.6, fat: 0.2 },
+    { name: "Melon", calories: 34, proteins: 0.8, carbohydrates: 8.2, fat: 0.2 },
+    { name: "Melons", calories: 34, proteins: 0.8, carbohydrates: 8.2, fat: 0.2 },
+    { name: "Raisin", calories: 69, proteins: 0.7, carbohydrates: 18.1, fat: 0.2 },
+    { name: "Raisins", calories: 69, proteins: 0.7, carbohydrates: 18.1, fat: 0.2 },
+    { name: "Pêche", calories: 39, proteins: 0.9, carbohydrates: 9.5, fat: 0.3 },
+    { name: "Pêches", calories: 39, proteins: 0.9, carbohydrates: 9.5, fat: 0.3 },
+    { name: "Abricot", calories: 48, proteins: 1.4, carbohydrates: 11.1, fat: 0.4 },
+    { name: "Abricots", calories: 48, proteins: 1.4, carbohydrates: 11.1, fat: 0.4 },
+    { name: "Kiwi", calories: 61, proteins: 1.1, carbohydrates: 14.7, fat: 0.5 },
+    { name: "Kiwis", calories: 61, proteins: 1.1, carbohydrates: 14.7, fat: 0.5 },
+    { name: "Ananas", calories: 50, proteins: 0.5, carbohydrates: 13.1, fat: 0.1 },
+    { name: "Mangue", calories: 60, proteins: 0.8, carbohydrates: 15.0, fat: 0.4 },
+    { name: "Citron", calories: 29, proteins: 1.1, carbohydrates: 9.3, fat: 0.3 },
+    { name: "Citrons", calories: 29, proteins: 1.1, carbohydrates: 9.3, fat: 0.3 },
     { name: "Blanc de poulet", calories: 165, proteins: 31, carbohydrates: 0, fat: 3.6 },
     { name: "Riz blanc cuit", calories: 130, proteins: 2.7, carbohydrates: 28, fat: 0.3 },
     { name: "Œuf", calories: 143, proteins: 12.6, carbohydrates: 0.7, fat: 9.5 }
 ];
-
-// Purge automatique du cache pour forcer la prise en compte
-if (!localStorage.getItem('nutritrack_cache_v4')) {
-    localStorage.removeItem('searchCache');
-    localStorage.setItem('nutritrack_cache_v4', 'true');
-}
 
 let searchCache = JSON.parse(localStorage.getItem('searchCache')) || {}, debounceTimer;
 document.getElementById('current-date').valueAsDate = new Date();
@@ -127,7 +140,7 @@ function debounceSearch() {
 async function searchFood(q) {
     let qLower = q.toLowerCase();
     
-    // Filtrer d'abord dans notre base locale de fruits/aliments bruts
+    // 1. Recherche prioritaire dans notre liste locale de fruits/aliments bruts
     let matchedLocal = localRawFoods.filter(item => item.name.toLowerCase().includes(qLower));
 
     if (searchCache[q]) { 
@@ -149,7 +162,7 @@ async function searchFood(q) {
             fat: p.nutriments?.['fat_100g'] || 0
         })).filter(p => p.name && p.name !== 'Inconnu');
 
-        // Nos aliments bruts locaux passent TOUJOURS en premier
+        // Fusion : les aliments bruts locaux apparaissent en premier, suivis de l'API
         let finalProducts = [...matchedLocal, ...apiProducts];
 
         searchCache[q] = finalProducts;
@@ -166,7 +179,7 @@ function displayResults(products) {
     container.innerHTML = '';
     if (!products || products.length === 0) { container.style.display = 'none'; return; }
     
-    // Supprimer les doublons
+    // Supprimer les doublons potentiels par nom
     let uniqueProducts = Array.from(new Map(products.map(p => [p.name, p])).values());
 
     uniqueProducts.slice(0, 6).forEach(p => {
