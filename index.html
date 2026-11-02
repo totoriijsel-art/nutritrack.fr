@@ -73,10 +73,10 @@ input, select {width:100%;padding:10px;margin:5px 0 15px 0;background-color:var(
 </div>
 </div>
 <script>
-// Nettoyage forcé du vieux cache corrompu au premier chargement
-if (!localStorage.getItem('nutritrack_cache_v2')) {
+// Nettoyage forcé du cache pour repartir sur une base propre
+if (!localStorage.getItem('nutritrack_cache_v3')) {
     localStorage.removeItem('searchCache');
-    localStorage.setItem('nutritrack_cache_v2', 'true');
+    localStorage.setItem('nutritrack_cache_v3', 'true');
 }
 
 let searchCache = JSON.parse(localStorage.getItem('searchCache')) || {}, debounceTimer;
@@ -113,7 +113,7 @@ function debounceSearch() {
 async function searchFood(q) {
     if (searchCache[q]) { displayResults(searchCache[q]); return; }
     try {
-        const url = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1&page_size=30`;
+        const url = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1&page_size=40`;
         const res = await fetch(url);
         const data = await res.json();
         
@@ -124,25 +124,24 @@ async function searchFood(q) {
             proteins: p.nutriments?.['proteins_100g'] || 0,
             carbohydrates: p.nutriments?.['carbohydrates_100g'] || 0,
             fat: p.nutriments?.['fat_100g'] || 0
-        })).filter(p => {
-            if (!p.name || p.name === 'Inconnu') return false;
-            let nameLower = p.name.toLowerCase();
-            
-            if (qLower.length <= 6) {
-                const bannedWords = ['confiture', 'danino', 'yaourt', 'sirop', 'biscuits', 'gâteau', 'glace', 'tarte', 'boisson', 'nectar', 'jus', 'arôme', 'préparation', 'carré frais', 'jben'];
-                for (let word of bannedWords) {
-                    if (nameLower.includes(word)) return false;
-                }
-            }
-            return true;
-        });
+        })).filter(p => p.name && p.name !== 'Inconnu');
 
+        // Tri intelligent basé sur la pertinence :
+        // 1. Les noms qui commencent exactement par le mot recherché (ex: "Fraise", "Fraises") passent en premier.
+        // 2. Ensuite les noms qui contiennent le mot.
+        // 3. Enfin les noms les plus courts (aliments bruts avant produits ultra-transformés longs).
         products.sort((a, b) => {
             let aName = a.name.toLowerCase();
             let bName = b.name.toLowerCase();
-            let aExact = aName === qLower ? 0 : 1;
-            let bExact = bName === qLower ? 0 : 1;
-            if (aExact !== bExact) return aExact - bExact;
+
+            let aStarts = aName.startsWith(qLower) ? 0 : 1;
+            let bStarts = bName.startsWith(qLower) ? 0 : 1;
+            if (aStarts !== bStarts) return aStarts - bStarts;
+
+            let aInc = aName.includes(qLower) ? 0 : 1;
+            let bInc = bName.includes(qLower) ? 0 : 1;
+            if (aInc !== bInc) return aInc - bInc;
+
             return aName.length - bName.length;
         });
 
